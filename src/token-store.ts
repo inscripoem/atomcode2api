@@ -1,7 +1,7 @@
 // src/token-store.ts
 // Persists auth tokens to disk and provides thread-safe access with auto-refresh.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { platform } from "node:os";
 import { join } from "node:path";
 
@@ -60,7 +60,7 @@ export function saveAuth(auth: AuthData): void {
 export function clearAuth(): void {
   cachedAuth = null;
   if (existsSync(AUTH_FILE)) {
-    try { import("node:fs").then(fs => fs.unlinkSync(AUTH_FILE)); } catch {}
+    try { unlinkSync(AUTH_FILE); } catch {}
   }
 }
 
