@@ -1,0 +1,21 @@
+services:
+  atomcode2api:
+    build: .
+    container_name: atomcode2api
+    restart: unless-stopped
+    ports:
+      - "3456:3456"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=3456
+      - API_KEY=${API_KEY:-}
+      - AUTO_CLAIM_PRO=${AUTO_CLAIM_PRO:-false}
+      - MONITOR_WEBHOOK=${MONITOR_WEBHOOK:-}
+      - MONITOR_WARN_PERCENT=${MONITOR_WARN_PERCENT:-80}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3456/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

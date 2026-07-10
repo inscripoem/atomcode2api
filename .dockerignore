@@ -1,0 +1,6 @@
+# Ignore runtime data
+data/
+*.json
+*.toml
+!package.json
+!tsconfig.json

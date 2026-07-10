@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>atomcode2api</title>
+<script>
+window.__unocss = {
+  theme: {
+    colors: {
+      background: '#09090b', foreground: '#fafafa',
+      card: '#0f0f10', 'card-foreground': '#fafafa',
+      popover: '#0f0f10', 'popover-foreground': '#fafafa',
+      primary: '#7c3aed', 'primary-foreground': '#fafafa',
+      secondary: '#18181b', 'secondary-foreground': '#fafafa',
+      muted: '#18181b', 'muted-foreground': '#a1a1aa',
+      accent: '#18181b', 'accent-foreground': '#fafafa',
+      destructive: '#7f1d1d', 'destructive-foreground': '#fafafa',
+      border: '#27272a', input: '#27272a', ring: '#7c3aed',
+      success: '#166534', warning: '#854d0e',
+    },
+    borderRadius: { DEFAULT: '0.5rem', lg: '0.75rem', md: '0.5rem', sm: '0.25rem', full: '9999px' },
+  },
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@unocss/runtime"></script>
+<style>
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 10%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 10%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 3.7% 10%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15%;
+    --input: 240 3.7% 15%;
+    --ring: 258 90% 66%;
+    --radius: 0.5rem;
+  }
+  *,::before,::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:hsl(var(--background));color:hsl(var(--foreground));min-height:100vh;-webkit-font-smoothing:antialiased;font-feature-settings:"rlig"1,"calt"1}
+  ::-webkit-scrollbar{width:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:hsl(var(--border));border-radius:99px}
+  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  .skeleton{background:linear-gradient(90deg,hsl(var(--muted))25%,hsl(var(--border))50%,hsl(var(--muted))75%);background-size:200%100%;animation:shimmer 1.5s infinite;border-radius:calc(var(--radius)-2px)}
+  .card{border-radius:var(--radius);border:1px solid hsl(var(--border)/.5);background:hsl(var(--card))}
+  button,select,input,textarea{font-family:inherit}
+  button,a,[role="button"],select,input[type="submit"]{cursor:pointer}
+  button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid hsl(var(--ring)/.3);outline-offset:2px;border-color:hsl(var(--ring)/.5)}
+  input,textarea,select{background:hsl(var(--input));border:1px solid hsl(var(--border));border-radius:var(--radius);color:hsl(var(--foreground));font-size:.875rem;padding:.5rem .75rem;transition:border-color .15s}
+  input::placeholder,textarea::placeholder{color:hsl(var(--muted-foreground))}
+  input:focus,textarea:focus,select:focus{border-color:hsl(var(--ring)/.5)}
+  pre{white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto}
+</style>
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "preact": "https://esm.sh/preact@10.25.4",
+    "preact/": "https://esm.sh/preact@10.25.4/",
+    "htm": "https://esm.sh/htm@3.1.1"
+  }
+}
+</script>
+
+<script type="module">
+import { h, render } from 'preact';
+import { useState, useEffect } from 'preact/hooks';
+import htm from 'htm';
+const html = htm.bind(h);
+
+// ── API ──
+async function api(path, opts = {}) {
+  const resp = await fetch(path, opts);
+  if (!resp.ok) throw new Error(`${resp.status} ${(await resp.text()).slice(0, 100)}`);
+  return resp.json();
+}
+
+async function doLogout() { await fetch('/api/auth/logout',{method:'DELETE'}); location.reload(); }
+function doLogin() { location.href = '/login'; }
+
+// ── Helpers ──
+function StatusDot({ ok }) {
+  return html`<span class="inline-flex h-2 w-2 rounded-full ${ok ? 'bg-green-500' : 'bg-amber-500'}"><span class="animate-ping absolute inline-flex h-2 w-2 rounded-full ${ok ? 'bg-green-400' : 'bg-amber-400'} opacity-75"></span></span>`;
+}
+
+function Skeleton({ w = 'full', h = 4 }) {
+  return html`<div class="skeleton" style="width:${w};height:${h/4}rem"></div>`;
+}
+
+// ── Components ──
+
+function Header({ auth }) {
+  return html`
+    <header class="sticky top-0 z-10 backdrop-blur-md bg-[#09090bee] border-b border-[#27272a44]">
+      <div class="max-w-4xl mx-auto flex items-center justify-between px-6 py-3">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center text-white font-bold text-sm">A</div>
+          <div>
+            <h1 class="text-base font-semibold tracking-tight">atomcode2api</h1>
+            <p class="text-xs text-[#71717a] -mt-0.5">OpenAI-compatible CodingPlan proxy</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          ${auth.loading ? html`<${Skeleton} w="5rem" h=${3} />` : html`
+            <div class="flex items-center gap-2 text-sm ${auth.logged_in ? 'text-green-400' : 'text-amber-400'}">
+              <${StatusDot} ok=${auth.logged_in} />
+              <span>${auth.logged_in ? 'Connected' : 'Disconnected'}</span>
+            </div>
+          `}
+          ${auth.logged_in ? html`
+            <button onclick=${doLogout} class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-3 hover:bg-[#27272a44] text-[#71717a] hover:text-[#a1a1aa] transition-colors">Logout</button>
+          ` : html`
+            <button onclick=${doLogin} class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 bg-purple-600 hover:bg-purple-700 text-white transition-colors">Login</button>
+          `}
+        </div>
+      </div>
+    </header>
+  `;
+}
+
+function UsageCard({ usage }) {
+  if (usage.loading) return html`<div class="card p-5"><${Skeleton} w="6rem" h=${3} /><div class="mt-3"><${Skeleton} w="10rem" h=${6} /></div><div class="mt-2"><${Skeleton} w="full" h=${2} /></div></div>`;
+  if (usage.error) return html`<div class="card p-5"><p class="text-sm text-[#a1a1aa]">${usage.error}</p></div>`;
+  if (!usage.data) return html`<div class="card p-5"><p class="text-sm text-[#71717a]">Login to view usage</p></div>`;
+
+  const d = usage.data;
+  const pct = d.usage_percent || 0;
+  const barColor = pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-green-500';
+
+  return html`
+    <div class="card p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-medium text-[#a1a1aa] uppercase tracking-wider">Usage</h3>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-medium">${d.plan_name || 'Free'}</span>
+      </div>
+      <div>
+        <span class="text-3xl font-bold tracking-tight">${d.used ?? 0}</span>
+        <span class="text-sm text-[#71717a] ml-1">/ ${d.window_limit ?? '?'} calls</span>
+      </div>
+      <div class="h-1.5 bg-[#27272a] rounded-full overflow-hidden">
+        <div class="h-full ${barColor} rounded-full transition-all duration-700" style="width:${Math.min(pct,100)}%"></div>
+      </div>
+      <div class="flex justify-between text-xs text-[#71717a]">
+        <span>${pct.toFixed(1)}%</span>
+        ${d.reset_at && html`<span>Resets ${d.reset_at}</span>`}
+        ${d.remaining_days != null && html`<span>${d.remaining_days}d remaining</span>`}
+      </div>
+      ${d.quota_exhausted && html`<p class="text-xs text-red-400 font-medium">Quota exhausted</p>`}
+    </div>
+  `;
+}
+
+function ModelsCard({ models }) {
+  if (models.loading) return html`<div class="card p-5"><${Skeleton} w="5rem" h=${3} /><div class="mt-3 space-y-2">${[1,2,3].map(() => html`<${Skeleton} w="full" h=${8} />`)}</div></div>`;
+  if (!models.data.length) return html`<div class="card p-5"><p class="text-sm text-[#71717a]">No models available</p></div>`;
+
+  return html`
+    <div class="card p-5 space-y-3">
+      <h3 class="text-sm font-medium text-[#a1a1aa] uppercase tracking-wider">Models</h3>
+      <div class="space-y-1.5">
+        ${models.data.map(model => html`
+          <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-[#09090b] border border-[#27272a44] hover:border-[#27272a88] transition-colors">
+            <div>
+              <p class="text-sm font-medium">${model.id}</p>
+              ${model.owned_by && html`<p class="text-xs text-[#71717a]">${model.owned_by}</p>`}
+            </div>
+            <span class="text-xs text-[#71717a]">${model.context_window ? (model.context_window/1000).toFixed(0)+'K' : ''}</span>
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
+}
+
+function AccountCard({ user }) {
+  if (!user) return null;
+  const initial = (user.name || user.username || '?')[0].toUpperCase();
+  return html`
+    <div class="card p-5 space-y-3">
+      <h3 class="text-sm font-medium text-[#a1a1aa] uppercase tracking-wider">Account</h3>
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm">${initial}</div>
+        <div>
+          <p class="text-sm font-medium">${user.name || user.username || 'User'}</p>
+          ${user.email && html`<p class="text-xs text-[#71717a]">${user.email}</p>`}
+          ${user.username && html`<p class="text-xs text-[#71717a]">@${user.username}</p>`}
+        </div>
+      </div>
+      ${user.id && html`<p class="text-xs text-[#52525b]">ID: ${user.id}</p>`}
+    </div>
+  `;
+}
+
+function ClaimCard({ usage }) {
+  const [claiming, setClaiming] = useState(false);
+  const [claimResult, setClaimResult] = useState('');
+  const u = usage.data;
+  if (!u) return null;
+
+  async function doClaim() {
+    setClaiming(true); setClaimResult('');
+    try {
+      const r = await fetch('/api/codingplan/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_type: 'Pro' }),
+      });
+      const d = await r.json();
+      setClaimResult(d.success ? 'Pro claimed!' : (d.message || d.error || 'Failed'));
+      if (d.success) location.reload();
+    } catch (e) {
+      setClaimResult('Error: ' + e.message);
+    }
+    setClaiming(false);
+  }
+
+  const planName = u.plan_name || 'Unknown';
+  const isPro = planName.toLowerCase().includes('pro');
+  const isLite = planName.toLowerCase().includes('lite');
+
+  return html`
+    <div class="card p-5 space-y-3">
+      <h3 class="text-sm font-medium text-[#a1a1aa] uppercase tracking-wider">Plan</h3>
+      <div class="flex items-center gap-2">
+        <span class="text-xs px-2 py-0.5 rounded-full font-medium ${isPro ? 'bg-amber-500/20 text-amber-400' : isLite ? 'bg-purple-500/20 text-purple-400' : 'bg-[#27272a] text-[#a1a1aa]'}">${planName}</span>
+        ${u.expires_at && html`<span class="text-xs text-[#71717a]">expires ${u.expires_at}</span>`}
+      </div>
+      ${u.remaining_days != null && html`<p class="text-xs text-[#71717a]">${u.remaining_days} days remaining</p>`}
+      <button onclick=${doClaim} disabled=${claiming || isPro}
+        class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 ${isPro ? 'bg-[#27272a] text-[#52525b] cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'} transition-colors">
+        ${claiming ? 'Claiming...' : isPro ? 'Already Pro' : 'Claim Pro'}
+      </button>
+      ${claimResult && html`<p class="text-xs ${claimResult.includes('Failed')||claimResult.includes('Error')?'text-red-400':'text-green-400'}">${claimResult}</p>`}
+    </div>
+  `;
+}
+
+function TestCard({ auth, models }) {
+  const [model, setModel] = useState('deepseek-v4-flash');
+  const [input, setInput] = useState('');
+  const [response, setResponse] = useState('');
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
+
+  async function sendTest() {
+    if (!input.trim()) return;
+    setResponse('');
+    setError('');
+    setSending(true);
+    try {
+      const resp = await fetch('/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages: [{role:'user',content:input}], max_tokens: 200, stream: false }),
+      });
+      const data = await resp.json();
+      setResponse(data.choices?.[0]?.message?.content || JSON.stringify(data,null,2));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return html`
+    <div class="card p-5 space-y-3">
+      <h3 class="text-sm font-medium text-[#a1a1aa] uppercase tracking-wider">Playground</h3>
+      <div class="flex gap-2 flex-wrap">
+        <select value=${model} onchange=${e => setModel(e.target.value)}
+          class="bg-[#09090b] border border-[#27272a] rounded-lg px-3 py-2 text-sm text-[#fafafa]">
+          ${models.data.map(m => html`<option value="${m.id}">${m.id}</option>`)}
+        </select>
+        <button onclick=${sendTest} disabled=${sending || !auth.logged_in}
+          class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-[#27272a] disabled:text-[#71717a] text-white transition-colors">
+          ${sending ? 'Sending...' : 'Send'}
+        </button>
+      </div>
+      <textarea value=${input} oninput=${e => setInput(e.target.value)}
+        placeholder="Type a message to test the API..."
+        class="w-full bg-[#09090b] border border-[#27272a] rounded-lg px-3 py-2.5 text-sm text-[#fafafa] placeholder-[#52525b] resize-none h-24 font-mono"
+      ></textarea>
+      ${error && html`<div class="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">${error}</div>`}
+      ${response && html`<pre class="rounded-lg bg-[#09090b] border border-[#27272a44] p-4 text-xs text-[#a1a1aa] max-h-72 overflow-y-auto font-mono leading-relaxed">${response}</pre>`}
+    </div>
+  `;
+}
+
+function EndpointsCard() {
+  const endpoints = [
+    { method: 'POST', path: '/v1/chat/completions', desc: 'Chat completions (streaming + non-streaming)' },
+    { method: 'GET', path: '/v1/models', desc: 'Available models list' },
+    { method: 'GET', path: '/v1/usage', desc: 'Quota and usage status' },
+    { method: 'GET', path: '/health', desc: 'Health check' },
+    { method: 'GET', path: '/login', desc: 'OAuth login page' },
+  ];
+  return html`
+    <div class="card p-5 space-y-3">
+      <h3 class="text-sm font-medium text-[#a1a1aa] uppercase tracking-wider">Endpoints</h3>
+      <div class="space-y-1">
+        ${endpoints.map(e => html`
+          <div class="flex items-start gap-3 py-2 px-3 rounded-lg hover:bg-[#27272a33] transition-colors">
+            <span class="text-xs font-bold px-1.5 py-0.5 rounded ${e.method==='POST'?'bg-blue-500/20 text-blue-400':'bg-green-500/20 text-green-400'} min-w-[3rem] text-center">${e.method}</span>
+            <div>
+              <code class="text-sm text-[#fafafa]">${e.path}</code>
+              <p class="text-xs text-[#71717a] mt-0.5">${e.desc}</p>
+            </div>
+          </div>
+        `)}
+      </div>
+    </div>
+  `;
+}
+
+function SettingsCard() {
+  const [config, setConfig] = useState({ auto_claim_pro: false, monitor_webhook: '', monitor_warn_percent: 80 });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/config').then(r => r.json()).then(setConfig).catch(()=>{});
+  }, []);
+
+  async function save(partial) {
+    setSaving(true); setMsg('');
+    try {
+      const r = await fetch('/api/config', { method: 'PATCH', headers: {'Content-Type':'application/json'}, body: JSON.stringify(partial) });
+      if (!r.ok) throw new Error(await r.text());
+      const d = await r.json();
+      setConfig(d.config || { ...config, ...partial });
+      setMsg('Saved');
+    } catch(e) { setMsg('Error: '+e.message); }
+    setSaving(false);
+  }
+
+  return html`
+    <div class="card p-5 space-y-4">
+      <h3 class="text-sm font-medium text-[#a1a1aa] uppercase tracking-wider">Settings</h3>
+      
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium">Auto-claim Pro</p>
+          <p class="text-xs text-[#71717a]">Daily at 10:00 Beijing time</p>
+        </div>
+        <button onclick=${() => save({auto_claim_pro: !config.auto_claim_pro})}
+          class="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors ${config.auto_claim_pro ? 'bg-purple-600' : 'bg-[#27272a]'}">
+          <span class="pointer-events-none block h-3.5 w-3.5 rounded-full bg-[#09090b] shadow-sm transition-transform ${config.auto_claim_pro ? 'translate-x-4' : 'translate-x-0.5'}"></span>
+        </button>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium block mb-1">Webhook URL</label>
+        <div class="flex gap-2">
+          <input value=${config.monitor_webhook || ''} onchange=${e => setConfig({...config, monitor_webhook: e.target.value})}
+            placeholder="https://hooks.slack.com/xxx"
+            class="flex-1 bg-[#09090b] border border-[#27272a] rounded-lg px-3 py-2 text-sm text-[#fafafa] placeholder-[#52525b]" />
+          <button onclick=${() => save({monitor_webhook: config.monitor_webhook})}
+            class="px-3 py-2 rounded-md text-sm bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] transition-colors">Save</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-sm font-medium block mb-1">Alert threshold (%)</label>
+        <div class="flex gap-2 items-center">
+          <input type="number" min="1" max="100" value=${config.monitor_warn_percent} onchange=${e => setConfig({...config, monitor_warn_percent: parseInt(e.target.value)||80})}
+            class="w-20 bg-[#09090b] border border-[#27272a] rounded-lg px-3 py-2 text-sm text-[#fafafa]" />
+          <button onclick=${() => save({monitor_warn_percent: config.monitor_warn_percent})}
+            class="px-3 py-2 rounded-md text-sm bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] transition-colors">Save</button>
+          <span class="text-xs text-[#52525b]">%</span>
+        </div>
+      </div>
+
+      ${msg && html`<p class="text-xs ${msg.startsWith('Error')?'text-red-400':'text-green-400'}">${msg}</p>`}
+      ${saving && html`<p class="text-xs text-[#71717a]">Saving...</p>`}
+    </div>
+  `;
+}
+
+function App() {
+  const [auth, setAuth] = useState({ logged_in: false, user: null, loading: true });
+  const [usage, setUsage] = useState({ loading: true, data: null, error: null });
+  const [models, setModels] = useState({ loading: true, data: [] });
+
+  async function fetchAll() {
+    try {
+      const d = await api('/api/auth/status');
+      setAuth({ ...d, loading: false });
+    } catch {
+      setAuth({ logged_in: false, user: null, loading: false });
+    }
+
+    try {
+      const d = await api('/v1/usage');
+      setUsage({ loading: false, data: d, error: null });
+    } catch (e) {
+      setUsage({ loading: false, data: null, error: e.message });
+    }
+
+    try {
+      const d = await api('/v1/models');
+      setModels({ loading: false, data: d.data || [] });
+    } catch {
+      setModels({ loading: false, data: [] });
+    }
+  }
+
+  useEffect(() => {
+    fetchAll();
+    const id = setInterval(fetchAll, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  return html`
+    <div class="min-h-screen bg-[#09090b]">
+      <${Header} auth=${auth} />
+      <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <${UsageCard} usage=${usage} />
+          <${ModelsCard} models=${models} />
+        </div>
+        ${auth.logged_in && auth.user ? html`
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <${AccountCard} user=${auth.user} />
+            <${ClaimCard} usage=${usage} />
+          </div>
+        ` : null}
+        <${TestCard} auth=${auth} models=${models} />
+        <${EndpointsCard} />
+        <${SettingsCard} />
+        <footer class="text-center text-xs text-[#52525b] py-6">
+          atomcode2api · OpenAI-compatible proxy for AtomCode CodingPlan
+        </footer>
+      </main>
+    </div>
+  `;
+}
+
+render(html`<${App} />`, document.getElementById('app'));
+</script>
+</body>
+</html>
