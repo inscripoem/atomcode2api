@@ -389,17 +389,16 @@ app.post("/v1/chat/completions", async (c) => {
     }
 
     // Model name mapping: CodingPlan display name → direct API model name
-    const MODEL_NAME_MAP: Record<string, string> = {
-      "deepseek-v4-flash": "deepseek-ai/DeepSeek-V4-Flash",
-      "deepseek-v4": "deepseek-ai/DeepSeek-V4-Flash",
-      "deepseek-r1": "deepseek-ai/DeepSeek-R1",
-      "qwen-vl": "Qwen/Qwen3-VL-8B-Instruct",
-      "qwen3-vl": "Qwen/Qwen3-VL-8B-Instruct",
-      "qwen3-vl-8b": "Qwen/Qwen3-VL-8B-Instruct",
-      "Qwen/Qwen3-VL-8B-Instruct": "Qwen/Qwen3-VL-8B-Instruct",
-      "glm-5": "GLM-5.2",
-      "GLM-5.2": "GLM-5.2",
-    };
+  const MODEL_NAME_MAP: Record<string, string> = {
+    "deepseek-v4-flash": "deepseek-ai/DeepSeek-V4-Flash",
+    "deepseek-v4": "deepseek-ai/DeepSeek-V4-Flash",
+    "qwen-vl": "Qwen/Qwen3-VL-8B-Instruct",
+    "qwen3-vl": "Qwen/Qwen3-VL-8B-Instruct",
+    "qwen3-vl-8b": "Qwen/Qwen3-VL-8B-Instruct",
+    "Qwen/Qwen3-VL-8B-Instruct": "Qwen/Qwen3-VL-8B-Instruct",
+    "glm-5": "GLM-5.2",
+    "GLM-5.2": "GLM-5.2",
+  };
     const upstreamModel = MODEL_NAME_MAP[requestedModel] || requestedModel;
 
     // Use CodingPlan direct API (no signing required!)

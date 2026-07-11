@@ -73,12 +73,13 @@ client.chat.completions.create(model="deepseek-v4-flash", messages=[{"role":"use
 
 ## 可用模型
 
-| 别名 | 实际模型 | 上下文 |
-|------|----------|--------|
-| `deepseek-v4-flash` / `deepseek-v4` | `deepseek-ai/DeepSeek-V4-Flash` | 1M |
-| `deepseek-r1` | `deepseek-ai/DeepSeek-R1` | 64K |
-| `qwen3-vl` / `qwen-vl` | `Qwen/Qwen3-VL-8B-Instruct` | 64K |
-| `glm-5` | `GLM-5.2` | 200K |
+| 别名 | 实际模型 | 上下文 | 计划 |
+|------|----------|--------|------|
+| `deepseek-v4-flash` / `deepseek-v4` | `deepseek-ai/DeepSeek-V4-Flash` | 1M | Lite |
+| `qwen3-vl` / `qwen-vl` | `Qwen/Qwen3-VL-8B-Instruct` | 64K | Lite |
+| `glm-5` | `GLM-5.2` | 200K | Pro 限定 |
+
+> 模型列表通过 CodingPlan API 动态获取，以 `/v1/models` 返回的为准。
 
 ## 脚本
 
