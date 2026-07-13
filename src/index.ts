@@ -28,7 +28,14 @@ let AUTO_CLAIM_PRO = process.env.AUTO_CLAIM_PRO === "true" || getConfig().auto_c
 // Auth middleware — protect /v1/* endpoints with optional API key
 // ---------------------------------------------------------------------------
 async function authMiddleware(c: Context, next: Next) {
-  if (!API_KEY) return next(); // no key set → skip auth
+  if (!API_KEY) return next();
+
+  // Skip auth for requests from our own dashboard (same-origin)
+  const referer = c.req.header("Referer") || "";
+  const origin = c.req.header("Origin") || "";
+  const host = c.req.header("Host") || "";
+  if (referer.includes(host) || origin.includes(host)) return next();
+
   const auth = c.req.header("Authorization") || "";
   const key = c.req.header("x-api-key") || "";
   const provided = auth.startsWith("Bearer ") ? auth.slice(7) : key;
