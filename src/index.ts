@@ -11,6 +11,9 @@ import { startLogin, pollLogin, exchangeToken } from "./auth";
 import { claimPlan, listModels, getStatus, type ModelEntry } from "./codingplan";
 import { loadAuth, clearAuth, getValidToken, isLoggedIn } from "./token-store";
 import { getConfig, saveConfig } from "./config-store";
+import logger from "./logger";
+import { isEnabled as isDashboardAuthEnabled, createSession, validateSession, destroySession, verifyPassword, dashboardAuthMiddleware } from "./auth-dashboard";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -75,6 +78,14 @@ app.use("*", cors({
   allowHeaders: ["Authorization", "Content-Type", "x-request-id"],
   exposeHeaders: ["x-request-id"],
 }));
+
+// Request logging middleware
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  logger.info({ method: c.req.method, path: c.req.path, status: c.res.status, latency: ms }, `${c.req.method} ${c.req.path} → ${c.res.status} ${ms}ms`);
+});
 
 // ---------------------------------------------------------------------------
 // Health
@@ -272,6 +283,50 @@ app.delete("/api/auth/logout", (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// Dashboard Auth API
+// ---------------------------------------------------------------------------
+
+// Login to dashboard
+app.post("/api/dashboard/login", async (c) => {
+  const { password } = await c.req.json<{ password: string }>();
+  if (!password) return c.json({ error: "Missing password" }, 400);
+  try {
+    const valid = await verifyPassword(password);
+    if (!valid) return c.json({ error: "Invalid password" }, 401);
+    const sessionId = await createSession();
+    setCookie(c, "dashboard_token", sessionId, {
+      httpOnly: true,
+      sameSite: "Lax",
+      path: "/",
+      maxAge: 86400,
+    });
+    return c.json({ success: true });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
+});
+
+// Logout from dashboard
+app.post("/api/dashboard/logout", async (c) => {
+  const token = getCookie(c, "dashboard_token");
+  if (token) await destroySession(token);
+  deleteCookie(c, "dashboard_token");
+  return c.json({ success: true });
+});
+
+// Dashboard auth status
+app.get("/api/dashboard/status", async (c) => {
+  const enabled = isDashboardAuthEnabled();
+  if (!enabled) return c.json({ enabled: false, authenticated: true });
+  const token = getCookie(c, "dashboard_token");
+  let authenticated = false;
+  if (token) {
+    authenticated = await validateSession(token);
+  }
+  return c.json({ enabled, authenticated });
+});
+
+// ---------------------------------------------------------------------------
 // CodingPlan API
 // ---------------------------------------------------------------------------
 
@@ -283,6 +338,8 @@ app.get("/api/codingplan/status", async (c) => {
     return c.json({ error: e.message }, e.message.includes("authentication failed") ? 401 : 500);
   }
 });
+
+app.use("/api/codingplan/claim", dashboardAuthMiddleware);
 
 app.post("/api/codingplan/claim", async (c) => {
   const { plan_type } = await c.req.json<{ plan_type: string }>();
@@ -346,7 +403,7 @@ async function fetchWithRetry(
     if (resp.status !== 429 || attempt === retries) return resp;
     const retryAfter = parseFloat(resp.headers.get("Retry-After") || "");
     const waitMs = Number.isFinite(retryAfter) ? retryAfter * 1000 : Math.min(2 ** attempt * 1000, 8000);
-    console.log(`[429] retry in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${retries})`);
+    logger.warn(`[429] retry in ${(waitMs / 1000).toFixed(1)}s (attempt ${attempt + 1}/${retries})`);
     await new Promise(resolve => setTimeout(resolve, waitMs));
   }
   throw new Error("retry exhausted");
@@ -558,17 +615,17 @@ if (MONITOR_INTERVAL_MS > 0) {
       const exhausted = status.window_quota_exhausted || activeWindow.quota_exhausted || false;
 
       if (exhausted) {
-        console.log(`[monitor] ⚠️ Quota exhausted!`);
+        logger.warn(`[monitor] ⚠️ Quota exhausted!`);
         if (MONITOR_WEBHOOK) await sendAlert("quota_exhausted", { percent, exhausted });
       } else if (percent >= MONITOR_WARN_PERCENT && percent > lastAlertPercent) {
-        console.log(`[monitor] ⚠️ Usage ${percent}% (threshold: ${MONITOR_WARN_PERCENT}%)`);
+        logger.warn(`[monitor] ⚠️ Usage ${percent}% (threshold: ${MONITOR_WARN_PERCENT}%)`);
         if (MONITOR_WEBHOOK) await sendAlert("usage_high", { percent });
         lastAlertPercent = percent;
       } else if (percent < MONITOR_WARN_PERCENT * 0.5) {
         lastAlertPercent = 0; // reset alert threshold once usage drops below 50% of warn level
       }
     } catch (e: any) {
-      console.log(`[monitor] check failed: ${e.message}`);
+      logger.warn(`[monitor] check failed: ${e.message}`);
     }
   }
 
@@ -630,22 +687,22 @@ if (AUTO_CLAIM_PRO) {
 
       try {
         const result = await claimProOnce(token);
-        console.log(`[claim-pro] ${result.message || JSON.stringify(result)}`);
+        logger.info(`[claim-pro] ${result.message || JSON.stringify(result)}`);
         if (result.success) { success = true; break; }
       } catch (e: any) {
-        console.log(`[claim-pro] error: ${e.message}`);
+        logger.warn(`[claim-pro] error: ${e.message}`);
       }
       await new Promise(r => setTimeout(r, 200));
     }
 
     claimedToday = today;
-    if (success) console.log(`[claim-pro] Pro claimed!`);
-    else console.log(`[claim-pro] window ended, will retry tomorrow`);
+    if (success) logger.info(`[claim-pro] Pro claimed!`);
+    else logger.info(`[claim-pro] window ended, will retry tomorrow`);
   }
 
   // Check every 30s — window is 1min, so we'll hit it at least twice
   setInterval(claimLoop, 30000);
-  console.log(`[claim-pro] Auto-claim Pro enabled (daily at 10:00 BJT)`);
+  logger.info(`[claim-pro] Auto-claim Pro enabled (daily at 10:00 BJT)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -659,6 +716,8 @@ app.get("/api/config", (c) => {
     api_key: API_KEY ? "***" + API_KEY.slice(-4) : "",
   });
 });
+
+app.use("/api/config", dashboardAuthMiddleware);
 
 app.patch("/api/config", async (c) => {
   try {
@@ -683,11 +742,13 @@ export default {
   fetch: app.fetch,
 };
 
-console.log(`atomcode2api running on http://localhost:${PORT}`);
-console.log(`  Auth:    ${API_KEY ? "API key required" : "no auth (set API_KEY env to enable)"}`);
-console.log(`  Monitor: ${MONITOR_INTERVAL_MS > 0 ? `every ${MONITOR_INTERVAL_MS / 1000}s, warn at ${MONITOR_WARN_PERCENT}%` + (MONITOR_WEBHOOK ? ", webhook enabled" : "") : "disabled"}`);
-console.log(`  Claim:   ${AUTO_CLAIM_PRO ? "auto-claim Pro at 10:00 BJT daily" : "disabled (set AUTO_CLAIM_PRO=true to enable)"}`);
-console.log(`  Login:   http://localhost:${PORT}/login`);
-console.log(`  API:     http://localhost:${PORT}/v1/chat/completions`);
-console.log(`  Usage:   http://localhost:${PORT}/v1/usage`);
-console.log(`  Health: http://localhost:${PORT}/health`);
+logger.info(`atomcode2api running on http://localhost:${PORT}`);
+logger.info(`  Auth:    ${API_KEY ? "API key required" : "no auth (set API_KEY env to enable)"}`);
+logger.info(`  Dash:    ${isDashboardAuthEnabled() ? "password protected (DASHBOARD_PASSWORD set)" : "open access (set DASHBOARD_PASSWORD to protect)"}`);
+logger.info(`  Logs:    level=${process.env.LOG_LEVEL || "info"}, file=data/logs/app.log`);
+logger.info(`  Monitor: ${MONITOR_INTERVAL_MS > 0 ? `every ${MONITOR_INTERVAL_MS / 1000}s, warn at ${MONITOR_WARN_PERCENT}%` + (MONITOR_WEBHOOK ? ", webhook enabled" : "") : "disabled"}`);
+logger.info(`  Claim:   ${AUTO_CLAIM_PRO ? "auto-claim Pro at 10:00 BJT daily" : "disabled (set AUTO_CLAIM_PRO=true to enable)"}`);
+logger.info(`  Login:   http://localhost:${PORT}/login`);
+logger.info(`  API:     http://localhost:${PORT}/v1/chat/completions`);
+logger.info(`  Usage:   http://localhost:${PORT}/v1/usage`);
+logger.info(`  Health: http://localhost:${PORT}/health`);

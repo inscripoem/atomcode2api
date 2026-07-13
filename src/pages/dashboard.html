@@ -105,7 +105,7 @@ function Skeleton({ w = 'full', h = 4 }) {
 
 // ── Components ──
 
-function Header({ auth }) {
+function Header({ auth, dashAuth }) {
   return html`
     <header class="sticky top-0 z-10 backdrop-blur-md bg-[#09090bee] border-b border-[#27272a44]">
       <div class="max-w-4xl mx-auto flex items-center justify-between px-6 py-3">
@@ -128,6 +128,9 @@ function Header({ auth }) {
           ` : html`
             <button onclick=${doLogin} class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-4 bg-purple-600 hover:bg-purple-700 text-white transition-colors">Login</button>
           `}
+          ${dashAuth && dashAuth.enabled && dashAuth.authenticated ? html`
+            <button onclick=${async () => { await fetch('/api/dashboard/logout', { method: 'POST' }); location.reload(); }} class="inline-flex items-center justify-center rounded-md text-sm font-medium h-9 px-3 hover:bg-[#27272a44] text-purple-400 hover:text-purple-300 transition-colors">Dashboard Logout</button>
+          ` : null}
         </div>
       </div>
     </header>
@@ -391,8 +394,80 @@ function SettingsCard() {
   `;
 }
 
+function LoginForm({ onLoginSuccess }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!password.trim()) return;
+    setError('');
+    setLoading(true);
+    try {
+      const resp = await fetch('/api/dashboard/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({ error: resp.statusText }));
+        throw new Error(errData.message || errData.error || 'Login failed');
+      }
+      const data = await resp.json();
+      if (data.success) {
+        onLoginSuccess();
+      } else {
+        setError(data.message || data.error || 'Login failed');
+      }
+    } catch (e) {
+      setError(e.message || 'Network error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return html`
+    <div class="min-h-screen bg-[#09090b] flex items-center justify-center px-4">
+      <div class="w-full max-w-sm">
+        <div class="card p-8 space-y-6">
+          <div class="text-center space-y-3">
+            <div class="w-14 h-14 rounded-xl bg-purple-600 flex items-center justify-center text-white font-bold text-2xl mx-auto">A</div>
+            <h1 class="text-xl font-semibold tracking-tight">Dashboard Login</h1>
+            <p class="text-sm text-[#71717a]">Enter password to access the dashboard</p>
+          </div>
+          <form onsubmit=${handleSubmit} class="space-y-4">
+            <div>
+              <input
+                type="password"
+                value=${password}
+                oninput=${e => setPassword(e.target.value)}
+                placeholder="Password"
+                autocomplete="current-password"
+                class="w-full bg-[#09090b] border border-[#27272a] rounded-lg px-3 py-2.5 text-sm text-[#fafafa] placeholder-[#52525b]"
+                disabled=${loading}
+              />
+            </div>
+            ${error && html`
+              <div class="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">${error}</div>
+            `}
+            <button
+              type="submit"
+              disabled=${loading || !password.trim()}
+              class="w-full inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-[#27272a] disabled:text-[#71717a] text-white transition-colors"
+            >
+              ${loading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function App() {
   const [auth, setAuth] = useState({ logged_in: false, user: null, loading: true });
+  const [dashAuth, setDashAuth] = useState({ loading: true, enabled: false, authenticated: false });
   const [usage, setUsage] = useState({ loading: true, data: null, error: null });
   const [models, setModels] = useState({ loading: true, data: [] });
 
@@ -419,15 +494,34 @@ function App() {
     }
   }
 
+  async function checkDashAuth() {
+    try {
+      const d = await api('/api/dashboard/status');
+      setDashAuth({ loading: false, enabled: !!d.enabled, authenticated: !!d.authenticated });
+    } catch {
+      setDashAuth({ loading: false, enabled: false, authenticated: false });
+    }
+  }
+
+  function onLoginSuccess() {
+    setDashAuth({ loading: false, enabled: true, authenticated: true });
+    fetchAll();
+  }
+
   useEffect(() => {
     fetchAll();
+    checkDashAuth();
     const id = setInterval(fetchAll, 30000);
     return () => clearInterval(id);
   }, []);
 
+  if (!dashAuth.loading && dashAuth.enabled && !dashAuth.authenticated) {
+    return html`<${LoginForm} onLoginSuccess=${onLoginSuccess} />`;
+  }
+
   return html`
     <div class="min-h-screen bg-[#09090b]">
-      <${Header} auth=${auth} />
+      <${Header} auth=${auth} dashAuth=${dashAuth} />
       <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <${UsageCard} usage=${usage} />

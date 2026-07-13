@@ -84,7 +84,12 @@ export async function claimPlan(planType: string): Promise<ClaimResponse> {
       const err = JSON.parse(body);
       if (err.message) throw new Error(err.message);
     } catch (e) {
-      if (e instanceof Error && e.message !== body) throw e;
+      // JSON parse errors (SyntaxError) → fall through to generic error
+      if (e instanceof SyntaxError) {
+        // fall through
+      } else if (e instanceof Error) {
+        throw e;
+      }
     }
     throw new Error(`claim-v2 returned ${resp.status}: ${body.slice(0, 200)}`);
   }

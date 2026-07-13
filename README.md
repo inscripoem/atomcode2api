@@ -48,6 +48,7 @@ client.chat.completions.create(model="deepseek-v4-flash", messages=[{"role":"use
 | GET/PATCH | `/api/config` | 运行配置 |
 | GET | `/api/codingplan/status` | CodingPlan 原始状态 |
 | POST | `/api/codingplan/claim` | 领取计划 |
+| POST | `/api/dashboard/login` | Dashboard 密码登录 |
 
 ## Dashboard
 
@@ -58,6 +59,8 @@ client.chat.completions.create(model="deepseek-v4-flash", messages=[{"role":"use
 - Playground 在线测试
 - Pro 自动领取开关
 - Webhook 告警设置
+
+**访问认证**：设置 `DASHBOARD_PASSWORD` 环境变量后，访问 Dashboard 需输入密码。登录态通过 HttpOnly Cookie 保持，有效期 24 小时。未设置时 Dashboard 完全开放（向后兼容）。
 
 ## 环境变量
 
@@ -70,6 +73,18 @@ client.chat.completions.create(model="deepseek-v4-flash", messages=[{"role":"use
 | `MONITOR_WEBHOOK` | 空 | 用量超阈值时 POST 告警的 URL |
 | `MONITOR_WARN_PERCENT` | `80` | 告警触发百分比 |
 | `ATOMCODE_PLATFORM_SERVER` | `https://acs.atomgit.com` | OAuth 平台地址 |
+| `DASHBOARD_PASSWORD` | 空 | 设置后 Dashboard 需密码登录 |
+| `LOG_LEVEL` | `info` | 日志级别：`trace` / `debug` / `info` / `warn` / `error` |
+
+## 日志
+
+基于 [pino](https://getpino.io/) 的结构化 JSON 日志：
+
+- **控制台输出**：终端下 pretty-print 彩色输出，重定向或非 TTY 环境输出纯 JSON
+- **文件输出**：`data/logs/app.log`，每日自动轮转，保留 7 天
+- **请求日志**：自动记录所有 HTTP 请求的方法、路径、状态码、响应耗时
+
+通过 `LOG_LEVEL` 环境变量控制日志级别（默认 `info`）。
 
 ## 可用模型
 
@@ -109,12 +124,6 @@ open http://localhost:3456/login
 ```bash
 docker pull ghcr.io/<your-org>/atomcode2api:latest
 ```
-
-## 技术原理
-
-atomcode 的 LLM 网关 (`llm-api.atomgit.com`) 要求每个请求携带 HMAC 签名，签名密钥在闭源 crate 中。
-
-但 CodingPlan 管理 API (`api.gitcode.com/api/v5`) 提供了一个 **未文档化的 `/chat/completions` 代理端点**。该端点只需 `Bearer token` + `User-Agent` 头，服务端验证身份后用自己的签名密钥转发请求。atomcode2api 利用此端点绕过了闭源签名。
 
 ## 许可证
 
