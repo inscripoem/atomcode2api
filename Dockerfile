@@ -12,6 +12,7 @@ COPY package.json tsconfig.json ./
 
 ENV PORT=3456
 ENV HOST=0.0.0.0
+RUN mkdir -p /app/data/logs
 EXPOSE 3456
 
 CMD ["bun", "run", "src/index.ts"]

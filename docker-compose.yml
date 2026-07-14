@@ -10,7 +10,12 @@ services:
     environment:
       - PORT=3456
       - API_KEY=${API_KEY:-}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - ATOMCODE_PLATFORM_SERVER=${ATOMCODE_PLATFORM_SERVER:-https://acs.atomgit.com}
+      - ATOMCODE_CODINGPLAN_API_BASE=${ATOMCODE_CODINGPLAN_API_BASE:-https://api.gitcode.com/api/v5}
       - AUTO_CLAIM_PRO=${AUTO_CLAIM_PRO:-false}
+      - MONITOR_INTERVAL=${MONITOR_INTERVAL:-300000}
       - MONITOR_WEBHOOK=${MONITOR_WEBHOOK:-}
       - MONITOR_WARN_PERCENT=${MONITOR_WARN_PERCENT:-80}
     healthcheck:

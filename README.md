@@ -75,6 +75,7 @@ client.chat.completions.create(model="deepseek-v4-flash", messages=[{"role":"use
 | `ATOMCODE_PLATFORM_SERVER` | `https://acs.atomgit.com` | OAuth 平台地址 |
 | `DASHBOARD_PASSWORD` | 空 | 设置后 Dashboard 需密码登录 |
 | `LOG_LEVEL` | `info` | 日志级别：`trace` / `debug` / `info` / `warn` / `error` |
+| `ATOMCODE_CODINGPLAN_API_BASE` | `https://api.gitcode.com/api/v5` | CodingPlan API 地址 |
 
 ## 日志
 
