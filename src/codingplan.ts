@@ -61,6 +61,19 @@ const COMMON_HEADERS = {
 };
 
 /**
+ * Sanitize upstream error body: detect HTML/gateway responses and
+ * return a clean message instead of raw markup.
+ */
+function formatUpstreamError(endpoint: string, status: number, body: string): string {
+  const trimmed = body.trimStart();
+  const isHtml = trimmed.startsWith("<") || trimmed.startsWith("<!DOCTYPE");
+  if (isHtml) {
+    return `${endpoint} returned ${status} (HTML — likely gateway/block, check server IP)`;
+  }
+  return `${endpoint} returned ${status}: ${trimmed.slice(0, 200)}`;
+}
+
+/**
  * Claim a CodingPlan tier (Max → Pro → Lite cascade).
  */
 export async function claimPlan(planType: string): Promise<ClaimResponse> {
@@ -79,19 +92,13 @@ export async function claimPlan(planType: string): Promise<ClaimResponse> {
   }
   if (!resp.ok) {
     const body = await resp.text();
-    // Try to extract message from JSON error
     try {
       const err = JSON.parse(body);
       if (err.message) throw new Error(err.message);
     } catch (e) {
-      // JSON parse errors (SyntaxError) → fall through to generic error
-      if (e instanceof SyntaxError) {
-        // fall through
-      } else if (e instanceof Error) {
-        throw e;
-      }
+      if (!(e instanceof SyntaxError) && e instanceof Error) throw e;
     }
-    throw new Error(`claim-v2 returned ${resp.status}: ${body.slice(0, 200)}`);
+    throw new Error(formatUpstreamError("claim-v2", resp.status, body));
   }
 
   return resp.json() as Promise<ClaimResponse>;
@@ -114,7 +121,7 @@ export async function listModels(planType: string = "Max"): Promise<ModelEntry[]
   }
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`models-v2 returned ${resp.status}: ${body.slice(0, 200)}`);
+    throw new Error(formatUpstreamError("models-v2", resp.status, body));
   }
 
   return resp.json() as Promise<ModelEntry[]>;
@@ -137,7 +144,7 @@ export async function getStatus(): Promise<StatusResponse> {
   }
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`status-v2 returned ${resp.status}: ${body.slice(0, 200)}`);
+    throw new Error(formatUpstreamError("status-v2", resp.status, body));
   }
 
   return resp.json() as Promise<StatusResponse>;
