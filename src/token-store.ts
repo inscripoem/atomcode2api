@@ -4,6 +4,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { platform } from "node:os";
 import { join } from "node:path";
+import proxyFetch from "./fetch-proxy";
 
 const CONFIG_DIR = join(import.meta.dirname, "..", "data");
 const AUTH_FILE = join(CONFIG_DIR, "auth.json");
@@ -107,7 +108,7 @@ async function doRefreshToken(auth: AuthData): Promise<AuthData | null> {
   const refreshUrl = `${platformServer}/oauth/refresh`;
 
   try {
-    const resp = await fetch(refreshUrl, {
+    const resp = await proxyFetch(refreshUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": "atomcode/4.26.0" },
       body: JSON.stringify({ refresh_token: auth.refresh_token }),

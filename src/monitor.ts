@@ -1,5 +1,6 @@
 // src/monitor.ts
 // Usage: bun run src/monitor.ts [--base-url URL] [--webhook URL] [--warn-percent 80]
+import proxyFetch from "./fetch-proxy";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -15,10 +16,10 @@ async function main() {
 
   baseUrl = baseUrl.replace(/\/+$/, "");
 
-  const healthResp = await fetch(`${baseUrl}/health`);
+  const healthResp = await proxyFetch(`${baseUrl}/health`);
   const health = (await healthResp.json()) as any;
 
-  const usageResp = await fetch(`${baseUrl}/v1/usage`);
+  const usageResp = await proxyFetch(`${baseUrl}/v1/usage`);
   const usage = (await usageResp.json()) as any;
 
   const ok = health.status === "ok" && health.logged_in;
@@ -29,7 +30,7 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 
   if (webhook && (!ok || percent >= warnPercent || exhausted)) {
-    await fetch(webhook, {
+    await proxyFetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(report),

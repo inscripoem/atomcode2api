@@ -2,6 +2,7 @@
 // OAuth login flow against AtomGit platform broker.
 
 import { saveAuth, AuthData } from "./token-store";
+import proxyFetch from "./fetch-proxy";
 
 interface LoginStartResponse {
   login_url: string;
@@ -36,7 +37,7 @@ function platformBase(): string {
  */
 export async function startLogin(): Promise<LoginStartResponse> {
   const url = `${platformBase()}/auth/login?provider=atomgit`;
-  const resp = await fetch(url, {
+  const resp = await proxyFetch(url, {
     method: "GET",
     headers: { "User-Agent": "atomcode/4.26.0" },
     signal: AbortSignal.timeout(10_000),
@@ -52,7 +53,7 @@ export async function startLogin(): Promise<LoginStartResponse> {
  */
 export async function pollLogin(state: string): Promise<boolean> {
   const url = `${platformBase()}/auth/check?state=${encodeURIComponent(state)}`;
-  const resp = await fetch(url, {
+  const resp = await proxyFetch(url, {
     signal: AbortSignal.timeout(10_000),
     headers: { "User-Agent": "atomcode/4.26.0" },
   });
@@ -70,7 +71,7 @@ export async function pollLogin(state: string): Promise<boolean> {
  */
 export async function exchangeToken(state: string): Promise<AuthData> {
   const url = `${platformBase()}/auth/token?state=${encodeURIComponent(state)}`;
-  const resp = await fetch(url, {
+  const resp = await proxyFetch(url, {
     signal: AbortSignal.timeout(10_000),
     headers: { "User-Agent": "atomcode/4.26.0" },
   });

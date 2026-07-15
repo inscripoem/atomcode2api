@@ -1,6 +1,7 @@
 // src/auto-claim.ts
 // Usage: bun run src/auto-claim.ts
 // Set CODINGPLAN_TOKEN env var or have auth.toml/auth.json available
+import proxyFetch from "./fetch-proxy";
 
 const UPSTREAM = "https://api.gitcode.com/api/v5";
 const UA = "atomcode/4.26.0";
@@ -42,7 +43,7 @@ function loadToken(): string {
 }
 
 async function claim(token: string): Promise<any> {
-  const resp = await fetch(`${UPSTREAM}/coding-plan/claim-v2`, {
+  const resp = await proxyFetch(`${UPSTREAM}/coding-plan/claim-v2`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
