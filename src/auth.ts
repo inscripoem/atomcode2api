@@ -38,7 +38,7 @@ export async function startLogin(): Promise<LoginStartResponse> {
   const url = `${platformBase()}/auth/login?provider=atomgit`;
   const resp = await fetch(url, {
     method: "GET",
-    headers: { "User-Agent": "atomcode2api/1.0" },
+    headers: { "User-Agent": "atomcode/4.26.0" },
     signal: AbortSignal.timeout(10_000),
   });
   if (!resp.ok) {
@@ -54,7 +54,7 @@ export async function pollLogin(state: string): Promise<boolean> {
   const url = `${platformBase()}/auth/check?state=${encodeURIComponent(state)}`;
   const resp = await fetch(url, {
     signal: AbortSignal.timeout(10_000),
-    headers: { "User-Agent": "atomcode2api/1.0" },
+    headers: { "User-Agent": "atomcode/4.26.0" },
   });
   if (!resp.ok) return false;
   try {
@@ -72,7 +72,7 @@ export async function exchangeToken(state: string): Promise<AuthData> {
   const url = `${platformBase()}/auth/token?state=${encodeURIComponent(state)}`;
   const resp = await fetch(url, {
     signal: AbortSignal.timeout(10_000),
-    headers: { "User-Agent": "atomcode2api/1.0" },
+    headers: { "User-Agent": "atomcode/4.26.0" },
   });
   if (!resp.ok) {
     throw new Error(`Token exchange failed: ${resp.status} ${await resp.text()}`);

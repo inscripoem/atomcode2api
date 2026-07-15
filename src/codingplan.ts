@@ -57,7 +57,7 @@ export interface StatusResponse {
 
 const COMMON_HEADERS = {
   "Content-Type": "application/json",
-  "User-Agent": "atomcode2api/1.0",
+  "User-Agent": "atomcode/4.26.0",
 };
 
 /**

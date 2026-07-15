@@ -109,7 +109,7 @@ async function doRefreshToken(auth: AuthData): Promise<AuthData | null> {
   try {
     const resp = await fetch(refreshUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "User-Agent": "atomcode2api/1.0" },
+      headers: { "Content-Type": "application/json", "User-Agent": "atomcode/4.26.0" },
       body: JSON.stringify({ refresh_token: auth.refresh_token }),
       signal: AbortSignal.timeout(10_000),
     });
