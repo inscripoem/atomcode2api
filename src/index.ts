@@ -14,7 +14,17 @@ import { getConfig, saveConfig } from "./config-store";
 import logger from "./logger";
 import { isEnabled as isDashboardAuthEnabled, createSession, validateSession, destroySession, verifyPassword, dashboardAuthMiddleware } from "./auth-dashboard";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import proxyFetch from "./fetch-proxy";
+
+// ---------------------------------------------------------------------------
+// Proxy — route all upstream requests through HTTP_PROXY (e.g. WARP/Privoxy)
+// undici is bundled with Bun; setGlobalDispatcher applies to ALL fetch() calls.
+// ---------------------------------------------------------------------------
+const PROXY_URL = process.env.HTTP_PROXY || process.env.HTTPS_PROXY || "";
+if (PROXY_URL) {
+  const { ProxyAgent, setGlobalDispatcher } = require("undici") as typeof import("undici");
+  setGlobalDispatcher(new ProxyAgent(PROXY_URL));
+  logger.info(`Proxy enabled: ${PROXY_URL}`);
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -400,7 +410,7 @@ async function fetchWithRetry(
   retries = 3,
 ): Promise<Response> {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const resp = await proxyFetch(url, { method, headers, body: bodyStr, signal });
+    const resp = await fetch(url, { method, headers, body: bodyStr, signal });
     if (resp.status !== 429 || attempt === retries) return resp;
     const retryAfter = parseFloat(resp.headers.get("Retry-After") || "");
     const waitMs = Number.isFinite(retryAfter) ? retryAfter * 1000 : Math.min(2 ** attempt * 1000, 8000);
@@ -632,7 +642,7 @@ if (MONITOR_INTERVAL_MS > 0) {
 
   async function sendAlert(type: string, data: any) {
     try {
-      await proxyFetch(MONITOR_WEBHOOK, {
+      await fetch(MONITOR_WEBHOOK, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, ...data, timestamp: new Date().toISOString(), service: "atomcode2api" }),
@@ -652,7 +662,7 @@ if (AUTO_CLAIM_PRO) {
   let claimedToday = ""; // date string to avoid double-claim
 
   async function claimProOnce(token: string) {
-    const resp = await proxyFetch("https://api.gitcode.com/api/v5/coding-plan/claim-v2", {
+    const resp = await fetch("https://api.gitcode.com/api/v5/coding-plan/claim-v2", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

@@ -2,7 +2,6 @@
 // CodingPlan API client — claim plans, list models, get status.
 
 import { getValidToken } from "./token-store";
-import proxyFetch from "./fetch-proxy";
 
 const DEFAULT_API_BASE = "https://api.gitcode.com/api/v5";
 
@@ -81,7 +80,7 @@ export async function claimPlan(planType: string): Promise<ClaimResponse> {
   const token = await getValidToken();
   const url = `${apiBase()}/coding-plan/claim-v2`;
 
-  const resp = await proxyFetch(url, {
+  const resp = await fetch(url, {
     method: "POST",
     headers: { ...COMMON_HEADERS, Authorization: `Bearer ${token}` },
     body: JSON.stringify({ plan_type: planType }),
@@ -112,7 +111,7 @@ export async function listModels(planType: string = "Max"): Promise<ModelEntry[]
   const token = await getValidToken();
   const url = `${apiBase()}/coding-plan/models-v2?plan_type=${encodeURIComponent(planType)}`;
 
-  const resp = await proxyFetch(url, {
+  const resp = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, "User-Agent": COMMON_HEADERS["User-Agent"] },
     signal: AbortSignal.timeout(10_000),
   });
@@ -135,7 +134,7 @@ export async function getStatus(): Promise<StatusResponse> {
   const token = await getValidToken();
   const url = `${apiBase()}/coding-plan/status-v2`;
 
-  const resp = await proxyFetch(url, {
+  const resp = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, "User-Agent": COMMON_HEADERS["User-Agent"] },
     signal: AbortSignal.timeout(10_000),
   });
